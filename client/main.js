@@ -3,7 +3,7 @@ Router.configure({
 });
 
 Router.route('/', function() {
-  this.redirect('basic');
+  this.redirect('jsonBasic');
 });
 
 Meteor.startup(function() {
