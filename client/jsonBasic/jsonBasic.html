@@ -1,9 +1,17 @@
 <template name="jsonBasic">
-  {{> wizard id="jsonBasic" route="jsonBasic" steps=steps stepsTemplate="steps_semanticUI" buttonClasses="ui button"}}
+    {{> wizard id="jsonBasic" route="jsonBasic" steps=steps stepsTemplate="steps_semanticUI" buttonClasses="ui button"}}
+
+    <h2>Edit wizard definition:</h2>
+    {{> jsonEditor }}
 </template>
 
 <template name="viewOrderJsonBasic">
   <p>Thanks for your order {{name}}.</p>
 
   <a href="/" class="ui button">Place another order</a>
+</template>
+
+
+<template name="jsonEditor">
+    <pre id="archy"></pre>
 </template>

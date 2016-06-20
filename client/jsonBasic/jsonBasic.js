@@ -48,20 +48,24 @@ Model = {
                 }
             }
         }
-    },
+    }
+
+    ,
     steps: [
         {
-            id: 'contact-information',
+            schemaId: 'contact-information',
             title: 'Contact information',
             schemaKey: 'contactInformation'
         },
+
         {
-            id: 'payment-information',
+            schemaId: 'payment-information',
             title: 'Payment & confirm',
             schemaKey: 'paymentInformation',
             addSubmitAction: true
         }
     ]
+
 };
 
 WizardCollections = new Meteor.Collection(Model.collectionName, {connection: null});
@@ -73,6 +77,11 @@ for (var i=0; i<schemaKeys.length; i++) {
 }
 
 for (var i=0; i<Model.steps.length; i++) {
+    // JSON spec for steps modified to use "schemaId" instead of "id" so that JSON.stringify() doesn't have issues with circular refs
+    if (typeof Model.steps[i].schemaId !== 'undefined' && Model.steps[i].schemaId !== null) {
+        Model.steps[i].id = Model.steps[i].schemaId;
+    }
+
     if (typeof Model.steps[i].schemaKey !== 'undefined' && Model.steps[i].schemaKey !== null) {
         Model.steps[i].schema = WizardSchemas[Model.steps[i].schemaKey];
     }
@@ -80,12 +89,12 @@ for (var i=0; i<Model.steps.length; i++) {
     if (Model.steps[i].addSubmitAction === true) {
         Model.steps[i].onSubmit = function (data, wizard) {
             var self = this;
-            WizardCollections.insert(_.extend(wizard.mergedData(), data), function (err, id) {
+            WizardCollections.insert(_.extend(wizard.mergedData(), data), function (err, docId) {
                 if (err) {
                     self.done();
                 } else {
                     Router.go('viewOrderJsonBasic', {
-                        _id: id
+                        _id: docId
                     });
                 }
             });
@@ -101,12 +110,12 @@ Template.jsonBasic.helpers({
             if (wizardSteps[i].addSubmitAction === true) {
                 wizardSteps[i].onSubmit = function (data, wizard) {
                     var self = this;
-                    WizardCollections.insert(_.extend(wizard.mergedData(), data), function (err, id) {
+                    WizardCollections.insert(_.extend(wizard.mergedData(), data), function (err, docId) {
                         if (err) {
                             self.done();
                         } else {
                             Router.go('viewOrderJsonBasic', {
-                                _id: id
+                                _id: docId
                             });
                         }
                     });
@@ -116,6 +125,19 @@ Template.jsonBasic.helpers({
         return wizardSteps;
     }
 });
+
+
+Template.jsonEditor.rendered = function(){
+    var editor;
+    Tracker.autorun(function (e) {
+        editor = AceEditor.instance("archy", {theme: "dawn", mode: "json"});
+        if(editor.loaded===true){
+            e.stop();
+            // editor.insert(JSON.stringify(Model));
+        }
+    });
+}
+
 
 Wizard.useRouter('iron:router');
 
@@ -142,4 +164,147 @@ Router.route('/jsonBasic/orders/:_id', {
   }
 });
 
+/*
+processedJSON =
+{
+    "collectionName"
+:
+    "orders", "schemas"
+:
+    {
+        "contactInformation"
+    :
+        {
+            "name"
+        :
+            {
+                "label"
+            :
+                "Name"
+            }
+        ,
+            "address"
+        :
+            {
+                "label"
+            :
+                "Address"
+            }
+        ,
+            "zipcode"
+        :
+            {
+                "label"
+            :
+                "Zipcode"
+            }
+        ,
+            "city"
+        :
+            {
+                "label"
+            :
+                "City"
+            }
+        }
+    ,
+        "paymentInformation"
+    :
+        {
+            "paymentMethod"
+        :
+            {
+                "label"
+            :
+                "Payment method", "allowedValues"
+            :
+                ["credit-card", "bank-transfer"], "autoform"
+            :
+                {
+                    "options"
+                :
+                    [{"label": "Credit card", "value": "credit-card"}, {
+                        "label": "Bank transfer",
+                        "value": "bank-transfer"
+                    }]
+                }
+            }
+        ,
+            "acceptTerms"
+        :
+            {
+                "label"
+            :
+                "I accept the terms and conditions.", "autoform"
+            :
+                {
+                    "label"
+                :
+                    false
+                }
+            }
+        }
+    }
+,
+    "steps"
+:
+    [{
+        "gid": "contact-information",
+        "title": "Contact information",
+        "schemaKey": "contactInformation",
+        "schema": {
+            "_schema": {
+                "name": {"label": "Name"},
+                "address": {"label": "Address"},
+                "zipcode": {"label": "Zipcode"},
+                "city": {"label": "City"}
+            },
+            "_schemaKeys": ["name", "address", "zipcode", "city"],
+            "_autoValues": {},
+            "_blackboxKeys": [],
+            "_validators": [],
+            "_messages": {},
+            "_depsMessages": {"_dependentsById": {}},
+            "_depsLabels": {
+                "name": {"_dependentsById": {}},
+                "address": {"_dependentsById": {}},
+                "zipcode": {"_dependentsById": {}},
+                "city": {"_dependentsById": {}}
+            },
+            "_firstLevelSchemaKeys": ["name", "address", "zipcode", "city"],
+            "_objectKeys": {},
+            "_validationContexts": {}
+        }
+    }, {
+        "gid": "payment-information",
+        "title": "Payment & confirm",
+        "schemaKey": "paymentInformation",
+        "addSubmitAction": true,
+        "schema": {
+            "_schema": {
+                "paymentMethod": {
+                    "label": "Payment method",
+                    "allowedValues": ["credit-card", "bank-transfer"],
+                    "autoform": {
+                        "options": [{
+                            "label": "Credit card",
+                            "value": "credit-card"
+                        }, {"label": "Bank transfer", "value": "bank-transfer"}]
+                    }
+                }, "acceptTerms": {"label": "I accept the terms and conditions.", "autoform": {"label": false}}
+            },
+            "_schemaKeys": ["paymentMethod", "acceptTerms"],
+            "_autoValues": {},
+            "_blackboxKeys": [],
+            "_validators": [],
+            "_messages": {},
+            "_depsMessages": {"_dependentsById": {}},
+            "_depsLabels": {"paymentMethod": {"_dependentsById": {}}, "acceptTerms": {"_dependentsById": {}}},
+            "_firstLevelSchemaKeys": ["paymentMethod", "acceptTerms"],
+            "_objectKeys": {},
+            "_validationContexts": {}
+        }
+    }]
+};
+*/
 
