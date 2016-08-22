@@ -1,23 +1,32 @@
 
-Model = {
+
+function hereDoc(f) {
+    return f.toString().
+    replace(/^[^\/]+\/\*!?/, '').
+    replace(/\*\/[^\/]+$/, '');
+}
+
+var defaultModelStr = hereDoc(function() {/*!
+Model=
+{
     collectionName: "orders",
     schemas: {
         contactInformation: {
             name: {
                 type: String,
-                label: 'Name'
+                    label: 'Name'
             },
             address: {
                 type: String,
-                label: 'Address'
+                    label: 'Address'
             },
             zipcode: {
                 type: String,
-                label: 'Zipcode'
+                    label: 'Zipcode'
             },
             city: {
                 type: String,
-                label: 'City'
+                    label: 'City'
             }
         },
         paymentInformation: {
@@ -48,16 +57,13 @@ Model = {
                 }
             }
         }
-    }
-
-    ,
+    },
     steps: [
         {
             schemaId: 'contact-information',
             title: 'Contact information',
             schemaKey: 'contactInformation'
         },
-
         {
             schemaId: 'payment-information',
             title: 'Payment & confirm',
@@ -65,47 +71,72 @@ Model = {
             addSubmitAction: true
         }
     ]
-
-};
-
-WizardCollections = new Meteor.Collection(Model.collectionName, {connection: null});
-WizardSchemas = {};
-var schemaKeys = Object.keys(Model.schemas);
-for (var i=0; i<schemaKeys.length; i++) {
-    var schemaKey = schemaKeys[i];
-    WizardSchemas[schemaKey] = new SimpleSchema(Model.schemas[schemaKey]);
 }
+ */});
 
-for (var i=0; i<Model.steps.length; i++) {
-    // JSON spec for steps modified to use "schemaId" instead of "id" so that JSON.stringify() doesn't have issues with circular refs
-    if (typeof Model.steps[i].schemaId !== 'undefined' && Model.steps[i].schemaId !== null) {
-        Model.steps[i].id = Model.steps[i].schemaId;
+var destroyForm = new ReactiveVar(false);
+var reactiveModelStr = new ReactiveVar(defaultModelStr);
+eval(reactiveModelStr.get());
+var reactiveModel = new ReactiveVar(Model);
+setupWizard(reactiveModel);
+
+// Todo: fix the method below
+function setupWizard (reactiveModel) {
+    // reactiveModelToDisplay = new ReactiveVar(Model);
+
+    WizardCollections = new Meteor.Collection(reactiveModel.get().collectionName, {connection: null});
+    WizardSchemas = {};
+    var schemaKeys = Object.keys(reactiveModel.get().schemas);
+    for (var i = 0; i < schemaKeys.length; i++) {
+        var schemaKey = schemaKeys[i];
+        WizardSchemas[schemaKey] = new SimpleSchema(reactiveModel.get().schemas[schemaKey]);
     }
 
-    if (typeof Model.steps[i].schemaKey !== 'undefined' && Model.steps[i].schemaKey !== null) {
-        Model.steps[i].schema = WizardSchemas[Model.steps[i].schemaKey];
-    }
+    for (var i = 0; i < reactiveModel.get().steps.length; i++) {
+        // JSON spec for steps modified to use "schemaId" instead of "id" so that JSON.stringify() doesn't have issues with circular refs
+        if (typeof reactiveModel.get().steps[i].schemaId !== 'undefined' && reactiveModel.get().steps[i].schemaId !== null) {
+            reactiveModel.get().steps[i].id = reactiveModel.get().steps[i].schemaId;
+        }
 
-    if (Model.steps[i].addSubmitAction === true) {
-        Model.steps[i].onSubmit = function (data, wizard) {
-            var self = this;
-            WizardCollections.insert(_.extend(wizard.mergedData(), data), function (err, docId) {
-                if (err) {
-                    self.done();
-                } else {
-                    Router.go('viewOrderJsonBasic', {
-                        _id: docId
-                    });
-                }
-            });
+        if (typeof reactiveModel.get().steps[i].schemaKey !== 'undefined' && reactiveModel.get().steps[i].schemaKey !== null) {
+            reactiveModel.get().steps[i].schema = WizardSchemas[reactiveModel.get().steps[i].schemaKey];
+        }
+
+        if (reactiveModel.get().steps[i].addSubmitAction === true) {
+            reactiveModel.get().steps[i].onSubmit = function (data, wizard) {
+                var self = this;
+                WizardCollections.insert(_.extend(wizard.mergedData(), data), function (err, docId) {
+                    if (err) {
+                        self.done();
+                    } else {
+                        Router.go('viewOrderJsonBasic', {
+                            _id: docId
+                        });
+                    }
+                });
+            }
         }
     }
 }
 
+Template.jsonBasic.rendered = function () {
+    var template = this;
+
+    // this is a wonky workaround for the fact that autoform doesn't handle reactively
+    // changing schema attribute, which should be fixed eventually
+    template.autorun(function () {
+        if (destroyForm.get()) {
+            destroyForm.set(false);
+        }
+    });
+};
 
 Template.jsonBasic.helpers({
+    destroyForm: function () {
+        return destroyForm.get();
+    },
     steps: function () {
-        var wizardSteps = Model.steps;
+        var wizardSteps = reactiveModel.get().steps;
         for (var i=0; i<wizardSteps.length; i++) {
             if (wizardSteps[i].addSubmitAction === true) {
                 wizardSteps[i].onSubmit = function (data, wizard) {
@@ -126,17 +157,31 @@ Template.jsonBasic.helpers({
     }
 });
 
-
 Template.jsonEditor.rendered = function(){
     var editor;
     Tracker.autorun(function (e) {
-        editor = AceEditor.instance("archy", {theme: "dawn", mode: "json"});
+        editor = AceEditor.instance("archy", {theme: "dawn", mode: "javascript"});
         if(editor.loaded===true){
             e.stop();
-            // editor.insert(JSON.stringify(Model));
+            editor.insert(reactiveModelStr.get());
         }
     });
-}
+};
+
+Template.jsonEditor.events({
+    'click #read': function(e, tmopl) {
+        var editor = AceEditor.instance("archy");
+        if(editor.loaded===true){
+            var editorContent = editor.getValue();
+            reactiveModelStr.set(editorContent);
+            eval(reactiveModelStr.get());
+            reactiveModel.set(Model);
+            destroyForm.set(true);
+            setupWizard(reactiveModel);
+            console.log("content: " + editorContent);
+        }
+    }
+});
 
 
 Wizard.useRouter('iron:router');
@@ -163,148 +208,4 @@ Router.route('/jsonBasic/orders/:_id', {
     return Orders.findOne(this.params._id);
   }
 });
-
-/*
-processedJSON =
-{
-    "collectionName"
-:
-    "orders", "schemas"
-:
-    {
-        "contactInformation"
-    :
-        {
-            "name"
-        :
-            {
-                "label"
-            :
-                "Name"
-            }
-        ,
-            "address"
-        :
-            {
-                "label"
-            :
-                "Address"
-            }
-        ,
-            "zipcode"
-        :
-            {
-                "label"
-            :
-                "Zipcode"
-            }
-        ,
-            "city"
-        :
-            {
-                "label"
-            :
-                "City"
-            }
-        }
-    ,
-        "paymentInformation"
-    :
-        {
-            "paymentMethod"
-        :
-            {
-                "label"
-            :
-                "Payment method", "allowedValues"
-            :
-                ["credit-card", "bank-transfer"], "autoform"
-            :
-                {
-                    "options"
-                :
-                    [{"label": "Credit card", "value": "credit-card"}, {
-                        "label": "Bank transfer",
-                        "value": "bank-transfer"
-                    }]
-                }
-            }
-        ,
-            "acceptTerms"
-        :
-            {
-                "label"
-            :
-                "I accept the terms and conditions.", "autoform"
-            :
-                {
-                    "label"
-                :
-                    false
-                }
-            }
-        }
-    }
-,
-    "steps"
-:
-    [{
-        "gid": "contact-information",
-        "title": "Contact information",
-        "schemaKey": "contactInformation",
-        "schema": {
-            "_schema": {
-                "name": {"label": "Name"},
-                "address": {"label": "Address"},
-                "zipcode": {"label": "Zipcode"},
-                "city": {"label": "City"}
-            },
-            "_schemaKeys": ["name", "address", "zipcode", "city"],
-            "_autoValues": {},
-            "_blackboxKeys": [],
-            "_validators": [],
-            "_messages": {},
-            "_depsMessages": {"_dependentsById": {}},
-            "_depsLabels": {
-                "name": {"_dependentsById": {}},
-                "address": {"_dependentsById": {}},
-                "zipcode": {"_dependentsById": {}},
-                "city": {"_dependentsById": {}}
-            },
-            "_firstLevelSchemaKeys": ["name", "address", "zipcode", "city"],
-            "_objectKeys": {},
-            "_validationContexts": {}
-        }
-    }, {
-        "gid": "payment-information",
-        "title": "Payment & confirm",
-        "schemaKey": "paymentInformation",
-        "addSubmitAction": true,
-        "schema": {
-            "_schema": {
-                "paymentMethod": {
-                    "label": "Payment method",
-                    "allowedValues": ["credit-card", "bank-transfer"],
-                    "autoform": {
-                        "options": [{
-                            "label": "Credit card",
-                            "value": "credit-card"
-                        }, {"label": "Bank transfer", "value": "bank-transfer"}]
-                    }
-                }, "acceptTerms": {"label": "I accept the terms and conditions.", "autoform": {"label": false}}
-            },
-            "_schemaKeys": ["paymentMethod", "acceptTerms"],
-            "_autoValues": {},
-            "_blackboxKeys": [],
-            "_validators": [],
-            "_messages": {},
-            "_depsMessages": {"_dependentsById": {}},
-            "_depsLabels": {"paymentMethod": {"_dependentsById": {}}, "acceptTerms": {"_dependentsById": {}}},
-            "_firstLevelSchemaKeys": ["paymentMethod", "acceptTerms"],
-            "_objectKeys": {},
-            "_validationContexts": {}
-        }
-    }]
-};
-*/
 

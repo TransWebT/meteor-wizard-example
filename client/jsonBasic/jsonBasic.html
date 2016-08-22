@@ -1,8 +1,12 @@
 <template name="jsonBasic">
-    {{> wizard id="jsonBasic" route="jsonBasic" steps=steps stepsTemplate="steps_semanticUI" buttonClasses="ui button"}}
+    {{#if destroyForm}}
+        {{! this is a wonky workaround for the fact that autoform doesn't handle reactively changing schema attribute, which should be fixed eventually}}
+    {{else}}
+        {{> wizard id="jsonBasic" route="jsonBasic" steps=steps stepsTemplate="steps_semanticUI" buttonClasses="ui button"}}
 
-    <h2>Edit wizard definition:</h2>
-    {{> jsonEditor }}
+        <h2>Edit wizard definition:</h2>
+        {{> jsonEditor }}
+    {{/if}}
 </template>
 
 <template name="viewOrderJsonBasic">
@@ -14,4 +18,6 @@
 
 <template name="jsonEditor">
     <pre id="archy"></pre>
+
+    <button id="read">Reload Form</button>
 </template>
